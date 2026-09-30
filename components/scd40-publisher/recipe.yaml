@@ -9,11 +9,23 @@ ComponentConfiguration:
   DefaultConfiguration:
     topicName: "greengrass-components/scd40-publisher/{iot:thingName}/telemetry"
     measurementIntervalSeconds: "60"
+    # topicName をデプロイ時に上書きする場合は、下の resources も
+    # 上書き後のトピックに一致するよう広げる／変更すること。
+    accessControl:
+      aws.greengrass.ipc.mqttproxy:
+        "com.example.Scd40Publisher:mqttproxy:1":
+          policyDescription: "SCD40テレメトリのIoT Coreへのpublishを許可"
+          operations:
+            - "aws.greengrass#PublishToIoTCore"
+          resources:
+            - "greengrass-components/scd40-publisher/*/telemetry"
 Manifests:
   - Platform:
       os: linux
     Lifecycle:
-      Install: "pip3 install --user -r {artifacts:decompressedPath}/scd40-publisher/requirements.txt"
+      Install:
+        Script: pip3 install --user -r {artifacts:decompressedPath}/scd40-publisher/requirements.txt
+        Timeout: 600
       Run: |
         GG_TOPIC_NAME="{configuration:/topicName}" GG_MEASUREMENT_INTERVAL_SECONDS="{configuration:/measurementIntervalSeconds}" PYTHONPATH="{artifacts:decompressedPath}/scd40-publisher/src" python3 -m scd40_publisher.main
     Artifacts:
