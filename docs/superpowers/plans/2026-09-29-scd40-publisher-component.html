@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>scd40-publisher Component Implementation Plan</title>
+<style>
+:root {
+  --bg: #fafaf8; --fg: #1f2328; --muted: #656d76; --card: #ffffff;
+  --border: #d8dee4; --accent: #0969da; --code-bg: #f3f4f6;
+  --warn-bg: #fff8e1; --warn-bd: #d29922; --info-bg: #eaf3ff; --info-bd: #0969da;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1117; --fg: #e6edf3; --muted: #8b949e; --card: #161b22;
+    --border: #30363d; --accent: #58a6ff; --code-bg: #1f242c;
+    --warn-bg: #2d2410; --warn-bd: #d29922; --info-bg: #0f2138; --info-bd: #58a6ff;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 16px/1.75 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", sans-serif;
+}
+.layout { max-width: 1080px; margin: 0 auto; padding: 24px 16px 64px; display: grid; gap: 24px; grid-template-columns: 1fr; }
+@media (min-width: 960px) { .layout { grid-template-columns: 220px minmax(0, 1fr); } .toc { position: sticky; top: 24px; align-self: start; } }
+header.page { grid-column: 1 / -1; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+header.page h1 { margin: 0 0 4px; font-size: 1.6rem; line-height: 1.35; }
+header.page .meta { color: var(--muted); font-size: .85rem; }
+.toc { font-size: .9rem; }
+.toc strong { display: block; margin-bottom: 6px; color: var(--muted); }
+.toc ol { margin: 0; padding-left: 1.2em; }
+.toc a { color: var(--accent); text-decoration: none; }
+.toc a:hover { text-decoration: underline; }
+main > section { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; margin-bottom: 16px; }
+main h2 { margin: 0 0 8px; font-size: 1.2rem; }
+main h3 { margin: 16px 0 6px; font-size: 1.05rem; }
+section.tldr { border-left: 5px solid var(--accent); }
+.callout { border-left: 4px solid; border-radius: 6px; padding: 8px 12px; margin: 10px 0; }
+.callout.warn { background: var(--warn-bg); border-color: var(--warn-bd); }
+.callout.info { background: var(--info-bg); border-color: var(--info-bd); }
+table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: .92rem; display: block; overflow-x: auto; }
+th, td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; vertical-align: top; }
+th { background: var(--code-bg); }
+code { background: var(--code-bg); padding: .1em .35em; border-radius: 4px; font: .88em ui-monospace, SFMono-Regular, Menlo, monospace; }
+pre { background: var(--code-bg); padding: 12px; border-radius: 8px; overflow-x: auto; }
+pre code { background: none; padding: 0; }
+details { border: 1px solid var(--border); border-radius: 8px; margin: 8px 0; padding: 0 12px; }
+details[open] { padding-bottom: 10px; }
+summary { cursor: pointer; padding: 8px 0; font-weight: 600; }
+a { color: var(--accent); }
+.diagram { margin: 8px 0 16px; overflow-x: auto; }
+.diagram svg { display: block; width: 100%; min-width: 560px; max-width: 880px; height: auto; }
+.diagram text { fill: var(--fg); font-size: 15px; font-family: inherit; }
+.diagram text.sub { fill: var(--muted); font-size: 13px; }
+.diagram text.cap { fill: var(--muted); font-size: 13px; font-weight: 600; }
+.diagram .node { fill: var(--card); stroke: var(--border); stroke-width: 1.5; }
+.diagram .node.accent { fill: var(--info-bg); stroke: var(--accent); }
+.diagram .node.warn { fill: var(--warn-bg); stroke: var(--warn-bd); }
+.diagram .group { fill: none; stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 6 4; }
+.diagram .edge { stroke: var(--muted); stroke-width: 1.8; fill: none; }
+.diagram marker path { fill: var(--muted); }
+@media print {
+  body { background: #fff; color: #000; }
+  .toc { display: none; }
+  .layout { display: block; }
+  main > section { break-inside: avoid; }
+  details { border: none; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+  <header class="page">
+    <h1>scd40-publisher Component Implementation Plan</h1>
+    <div class="meta">元ファイル: 2026-09-29-scd40-publisher-component.md</div>
+  </header>
+  <!-- 目次: 本文の各 section の id と対応させる -->
+  <nav class="toc">
+    <strong>目次</strong>
+    <ol>
+      <li><a href="#tldr">結論</a></li>
+      <li><a href="#overview">全体像</a></li>
+      <li><a href="#points">要点</a></li>
+      <li><a href="#actions">判断・対応が必要な点</a></li>
+      <li><a href="#details">詳細</a></li>
+      <li><a href="#source">元ファイル</a></li>
+    </ol>
+  </nav>
+  <main>
+<section id="tldr" class="tldr">
+  <h2>結論(TL;DR)</h2>
+  <p>この文書は、SCD40センサー(CO2・温度・湿度)の値をAWS IoT Coreへ定期送信するGreengrassカスタムコンポーネント <code>scd40-publisher</code> を実装するための、6タスクの実装計画です。Pythonのバージョンは3.13です。</p>
+  <p>リポジトリをuvワークスペースのモノレポとして整備し、ビルドスクリプトまで揃えます。各機能はテストを先に書いてから実装する進め方です。</p>
+  <p>センサー読み取りや送信が失敗してもプロセスは落とさず、ログを残して次の測定サイクルへ進む設計です。アーティファクト用のS3バケットが未作成のため、デプロイ関連は今回の対象外です。AWS側リソースの作成とCI導入も対象外です。</p>
+</section>
+
+<section id="overview">
+  <h2>全体像</h2>
+
+  <h3>実行時の流れ(Raspberry Pi 上)</h3>
+  <div class="diagram">
+  <svg viewBox="0 0 850 150" role="img" aria-label="SCD40センサーの値をコンポーネントが読み取り、Greengrass IPC経由でAWS IoT Coreへ送信する流れ">
+    <defs><marker id="arrow1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z"/></marker></defs>
+    <rect class="group" x="185" y="15" width="400" height="120" rx="12"/>
+    <text class="cap" x="197" y="34">scd40-publisher コンポーネント</text>
+    <rect class="node" x="10" y="50" width="130" height="64" rx="10"/>
+    <text x="75" y="78" text-anchor="middle">SCD40</text>
+    <text class="sub" x="75" y="98" text-anchor="middle">CO2・温度・湿度</text>
+    <line class="edge" x1="140" y1="82" x2="205" y2="82" marker-end="url(#arrow1)"/>
+    <text class="sub" x="165" y="72" text-anchor="middle">I2C</text>
+    <rect class="node accent" x="205" y="50" width="140" height="64" rx="10"/>
+    <text x="275" y="78" text-anchor="middle">読み取り部</text>
+    <text class="sub" x="275" y="98" text-anchor="middle">完了を待って取得</text>
+    <line class="edge" x1="345" y1="82" x2="425" y2="82" marker-end="url(#arrow1)"/>
+    <text class="sub" x="385" y="72" text-anchor="middle">測定値</text>
+    <rect class="node accent" x="425" y="50" width="140" height="64" rx="10"/>
+    <text x="495" y="78" text-anchor="middle">送信部</text>
+    <text class="sub" x="495" y="98" text-anchor="middle">JSON にして送信</text>
+    <line class="edge" x1="565" y1="82" x2="700" y2="82" marker-end="url(#arrow1)"/>
+    <text class="sub" x="642" y="72" text-anchor="middle">IPC 経由</text>
+    <rect class="node" x="700" y="50" width="140" height="64" rx="10"/>
+    <text x="770" y="78" text-anchor="middle">AWS IoT Core</text>
+    <text class="sub" x="770" y="98" text-anchor="middle">MQTT トピック</text>
+  </svg>
+  </div>
+
+  <h3>ビルドの流れ(開発機上)</h3>
+  <div class="diagram">
+  <svg viewBox="0 0 760 200" role="img" aria-label="ソース・レシピと、uvが書き出した依存一覧をビルドスクリプトがまとめて、配布用のzipを作る流れ">
+    <defs><marker id="arrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z"/></marker></defs>
+    <rect class="node" x="10" y="10" width="180" height="64" rx="10"/>
+    <text x="100" y="38" text-anchor="middle">ソース・レシピ</text>
+    <text class="sub" x="100" y="58" text-anchor="middle">コンポーネント定義</text>
+    <rect class="node" x="10" y="126" width="180" height="64" rx="10"/>
+    <text x="100" y="154" text-anchor="middle">uv</text>
+    <text class="sub" x="100" y="174" text-anchor="middle">依存一覧を書き出し</text>
+    <polyline class="edge" points="190,42 245,42 245,90 300,90" marker-end="url(#arrow2)"/>
+    <polyline class="edge" points="190,158 245,158 245,110 300,110" marker-end="url(#arrow2)"/>
+    <rect class="node accent" x="300" y="68" width="170" height="64" rx="10"/>
+    <text x="385" y="96" text-anchor="middle">ビルドスクリプト</text>
+    <text class="sub" x="385" y="116" text-anchor="middle">zip にまとめる</text>
+    <line class="edge" x1="470" y1="100" x2="580" y2="100" marker-end="url(#arrow2)"/>
+    <text class="sub" x="525" y="90" text-anchor="middle">生成</text>
+    <rect class="node accent" x="580" y="68" width="170" height="64" rx="10"/>
+    <text x="665" y="96" text-anchor="middle">配布用 zip</text>
+    <text class="sub" x="665" y="116" text-anchor="middle">名前とバージョンで保存</text>
+  </svg>
+  </div>
+</section>
+
+<section id="points">
+  <h2>要点</h2>
+  <ol>
+    <li><strong>複数コンポーネントを1つで管理するために、</strong>リポジトリをuvワークスペースのモノレポにし、コンポーネントを専用ディレクトリの下へ追加していく形にします。</li>
+    <li><strong>デバイス側の構成を増やさないために、</strong>Raspberry Piにはuvを入れず、ビルド時に書き出した依存一覧をpip3だけで導入します。</li>
+    <li><strong>実機なしでテストできるように、</strong>I2CセンサーとGreengrass IPCへの依存は「実物を生成する関数」に閉じ込め、テストは偽物のオブジェクトで実行ロジックを検証します。</li>
+    <li><strong>測定を止めないために、</strong>センサー読み取りの失敗も、IoT Coreへの送信失敗もログに残して次のサイクルへ進みます。送信に失敗したデータは破棄し、ローカルキューは持ちません。</li>
+    <li><strong>異常時の復旧をGreengrassに任せるために、</strong>起動時にI2Cデバイスを検出できなければプロセスを終了し、再起動はライフサイクル管理に委ねます。</li>
+    <li><strong>設定を実行に反映するために、</strong>レシピで定義したトピック名と測定間隔(既定は60秒)を環境変数経由でプログラムへ渡します。</li>
+    <li><strong>配布物を同じ手順で作れるように、</strong>ビルドをスクリプト化し、ソース・レシピ・依存一覧をzipにまとめます。デプロイはS3バケットが未作成のため、今回は含めません。</li>
+  </ol>
+</section>
+
+<section id="actions">
+  <h2>判断・対応が必要な点</h2>
+  <p>元文書に「未決」「要確認」と明記された項目はありません。以下は、今回の範囲の確認事項と、あとまわしにした項目です。</p>
+  <ul>
+    <li><strong>デプロイは別タスクに回す:</strong> アーティファクト用のS3バケットが現在存在しないため、デプロイスクリプト、コンポーネント登録、デプロイ作成、デプロイ手順書は今回作りません。設計書のデプロイ関連の記述は、S3バケットの準備後に実施します。</li>
+    <li><strong>レシピの仮の値はそのまま:</strong> バージョンとアーティファクトのURIは仮の値のままです。デプロイ処理を整備する際に、実際の値へ書き換える仕組みを追加します。</li>
+    <li><strong>対象外の確認:</strong> AWS側リソースの作成とCI(GitHub Actionsなど)の導入も、本タスクのスコープ外です。</li>
+    <li><strong>レビューで確認する4点:</strong>
+      <ul>
+        <li>センサー読み取り失敗時にプロセスが落ちず、次の測定サイクルで継続すること。</li>
+        <li>IoT Core送信失敗時にログのみを記録してデータを破棄し、例外を伝播させないこと。</li>
+        <li>起動時にI2Cデバイスを検出できなければ終了し、再起動をGreengrassに委ねること。</li>
+        <li>レシピのトピック名・測定間隔が環境変数経由で実行に正しく反映されること。</li>
+      </ul>
+    </li>
+  </ul>
+  <div class="callout warn">実機のセンサーとGreengrass IPCを生成する2つの関数(<code>create_hardware_sensor</code>、<code>create_ipc_publisher</code>)は、計画上どのテストからも呼び出されません。実機での動作は自動テストの対象外です。</div>
+</section>
+
+<section id="details">
+  <h2>詳細</h2>
+
+  <details open>
+    <summary>概要(ゴール・構成・技術スタック)</summary>
+    <p><strong>ゴール:</strong> リポジトリをuvワークスペースのモノレポとして整備し、SCD40センサーの値をAWS IoT Coreへ定期送信するコンポーネントを実装します。ビルドスクリプトとドキュメントも揃えます。デプロイはS3バケットが未作成のため対象外です。</p>
+    <p><strong>構成:</strong> ルートにuvワークスペースを置き、コンポーネントはsrcレイアウトのPythonパッケージとして実装します。ハードウェアとIPCへの依存は実物を生成するファクトリ関数に隔離します。ビルドスクリプトでは、外部コマンド実行を差し替え可能にしてテストします。</p>
+    <p><strong>技術スタック:</strong> Python 3.13、uv、pytest、adafruit-circuitpython-scd4x、adafruit-blinka、awsiotsdk、PyYAML。</p>
+    <p><strong>設計書:</strong> <code>docs/superpowers/specs/2026-09-29-greengrass-scd40-component-setup-design.md</code></p>
+    <div class="callout info">実行する場合は、superpowers:subagent-driven-development(推奨)または superpowers:executing-plans を使い、チェックボックス付きのステップをタスク単位で進めます。</div>
+  </details>
+
+  <details open>
+    <summary>全体の制約</summary>
+    <ul>
+      <li>パッケージ管理はuvを使います。Raspberry Pi側にはuvを入れず、pip3のみで依存を導入します。</li>
+      <li>モノレポ構成とし、コンポーネントは <code>components/</code> 配下にディレクトリを追加して管理します。</li>
+      <li>S3バケット、IoT Thing/Thing Group、IAMポリシーの作成はスコープ外です。</li>
+      <li>デプロイ関連(デプロイスクリプト、S3アップロード、コンポーネント登録、デプロイ作成、デプロイ手順書)はスコープ外です。アーティファクト用S3バケットが現在存在しないためです。</li>
+      <li>CI導入はスコープ外です。</li>
+      <li>Pythonのバージョンは3.13とします。</li>
+      <li>IoT Coreへの送信失敗時はローカルキューを持たず、ログ記録のみでデータを破棄します。</li>
+      <li>測定間隔の既定値は60秒、MQTTトピックの既定値は <code>greengrass-components/scd40-publisher/&lt;thingName&gt;/telemetry</code> です。</li>
+    </ul>
+  </details>
+
+  <details open>
+    <summary>ファイル構成</summary>
+    <ul>
+      <li><strong>リポジトリのルート:</strong> ワークスペース設定、Pythonバージョン指定、除外設定、README。共有の開発用依存(pytest、PyYAML)もここで持ちます。</li>
+      <li><strong>ルートのテスト置き場:</strong> レシピの構造検証と、ビルドスクリプトの単体テスト。</li>
+      <li><strong>スクリプト置き場:</strong> ビルド(依存一覧の生成とzip化)の1本。</li>
+      <li><strong>コンポーネントのディレクトリ:</strong> 個別の依存定義、Greengrassレシピ、ソース(センサー読み取り、IoT Core送信、エントリポイントの3モジュール)、それぞれのテスト。</li>
+    </ul>
+  </details>
+
+  <details open>
+    <summary>タスク1: uvワークスペースとコンポーネント雛形の作成</summary>
+    <p>まず「パッケージをimportできる」という失敗するテストを書き、雛形を作って通します。</p>
+    <ul>
+      <li>ルートの設定で、<code>components/</code> 配下をワークスペースのメンバーにし、pytestがスクリプト置き場とコンポーネントのテストを見つけられるようにします。</li>
+      <li>Pythonは3.13を指定し、仮想環境やビルド成果物などをGit管理から除外します。</li>
+      <li>コンポーネント側には、センサー・Adafruitライブラリ・AWS IoT SDKの依存と、hatchlingによるビルド設定を置きます。</li>
+      <li>依存を <code>uv sync</code> で解決し、テストの合格を確認します。</li>
+      <li>READMEに、リポジトリの役割、セットアップ手順、コンポーネント一覧、ビルド手順を追記します。デプロイは「未整備(S3バケット用意後に追加)」と記します。</li>
+    </ul>
+  </details>
+
+  <details open>
+    <summary>タスク2: センサー読み取りロジック(TDD)</summary>
+    <p>SCD40から測定値を1回分取得する部分です。テストは2件です。</p>
+    <ul>
+      <li>測定値は、CO2濃度、温度、湿度の3項目をまとめた1つのデータとして扱います。</li>
+      <li>定期測定の開始は最初の読み取り時に1回だけ行います。</li>
+      <li>データの準備が整うまで、一定間隔(既定1秒)で待ってから値を返します。</li>
+      <li>実機のI2Cとセンサーを組み立てる処理は別関数に分け、必要になったときに初めて関連ライブラリをimportします。</li>
+    </ul>
+  </details>
+
+  <details open>
+    <summary>タスク3: AWS IoT Coreへのパブリッシュ(TDD)</summary>
+    <p>測定値をIoT Coreへ送る部分です。テストは1件で、偽のIPCクライアントに渡された内容を検証します。</p>
+    <ul>
+      <li>送信内容は、CO2・温度・湿度に現在時刻(UTC)を加えたJSONです。</li>
+      <li>設定されたトピックへ送ります。</li>
+      <li>実機ではGreengrass IPCで接続し、QoSは「少なくとも1回」、応答待ちは10秒とします。</li>
+      <li>実際のIPC接続を作る処理は別関数に分け、テストからは呼びません。</li>
+    </ul>
+  </details>
+
+  <details open>
+    <summary>タスク4: エントリポイントと実行ループ(TDD)</summary>
+    <p>測定と送信を繰り返す本体です。テストは6件です。</p>
+    <ul>
+      <li><strong>1サイクル:</strong> 読み取りに成功したら送信します。読み取りに失敗したらログを出して戻ります。送信に失敗したらログを出してそのデータを破棄します。いずれも例外は外へ出しません。</li>
+      <li><strong>起動:</strong> センサーの初期化に失敗したら、ログを出して終了コード1で終了します。</li>
+      <li><strong>設定:</strong> トピック名は <code>GG_TOPIC_NAME</code>(既定 <code>greengrass-components/scd40-publisher/default/telemetry</code>)、測定間隔は <code>GG_MEASUREMENT_INTERVAL_SECONDS</code>(既定60)の環境変数から読みます。</li>
+      <li><strong>ループ:</strong> サイクルの間で待機します。テストのために、実行回数の上限と待機処理を差し替えられます。上限に達した最後のサイクルの後には待機しません。</li>
+      <li>テストでは、正常系、読み取り失敗、送信失敗、初期化失敗による終了、回数を限った実行、環境変数による上書きを確認します。</li>
+    </ul>
+  </details>
+
+  <details open>
+    <summary>タスク5: Greengrassレシピと検証テスト</summary>
+    <p>コンポーネントの定義ファイルです。テストは3件で、構造だけを検証します。</p>
+    <ul>
+      <li>コンポーネント名は <code>com.example.Scd40Publisher</code> です。</li>
+      <li>既定設定として、トピック名(Thing名を埋め込む形)と測定間隔(60秒)を持ちます。</li>
+      <li>インストール時に、依存一覧からpip3で導入します。</li>
+      <li>実行時に、レシピの設定値を環境変数へ渡し、ソースの場所を指定してエントリポイントを起動します。</li>
+      <li>バージョン(<code>0.0.0</code>)とアーティファクトのURIは仮の値です。将来のデプロイ処理が書き換える前提で、今回は仮のままにします。</li>
+    </ul>
+  </details>
+
+  <details open>
+    <summary>タスク6: ビルドスクリプト(TDD)</summary>
+    <p>コンポーネントを配布用のzipにまとめます。テストは1件で、外部コマンドの実行を偽物に差し替えて行います。</p>
+    <ol>
+      <li>コンポーネントの定義ファイルからバージョンを読みます。</li>
+      <li>uvで開発用を除いた依存一覧を書き出します。</li>
+      <li>ソース、レシピ、依存一覧を作業用フォルダに集めます。</li>
+      <li>コンポーネント名とバージョンで分けたフォルダにzipとして保存します。</li>
+    </ol>
+    <p>コマンドラインからはコンポーネント名を1つ指定して実行します。最後に、実際にスクリプトを動かしてzipが生成されることを確認します。</p>
+  </details>
+</section>
+
+<section id="source">
+  <h2>元ファイル</h2>
+  <p>各タスクの実装コード、テストコード、コミットメッセージなどの技術詳細は、元のMarkdownを参照してください。</p>
+  <p><a href="2026-09-29-scd40-publisher-component.md">2026-09-29-scd40-publisher-component.md</a></p>
+</section>
+  </main>
+</div>
+</body>
+</html>
