@@ -25,6 +25,7 @@ def export_requirements(component_dir: Path, runner: CommandRunner) -> str:
             str(component_dir),
             "--no-dev",
             "--no-emit-project",
+            "--no-header",
             "--format",
             "requirements-txt",
         ]
@@ -68,7 +69,8 @@ def build_artifact(
 
 
 def _default_runner(command: list[str]) -> subprocess.CompletedProcess:
-    return subprocess.run(command, check=True, capture_output=True, text=True)
+    # stdoutのみ取得し、uvのエラー出力(stderr)はそのままターミナルに流す
+    return subprocess.run(command, check=True, stdout=subprocess.PIPE, text=True)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -79,6 +81,9 @@ def main(argv: list[str] | None = None) -> None:
     repo_root = Path(__file__).resolve().parents[1]
     component_dir = repo_root / "components" / args.component
     build_root = repo_root / "build"
+
+    if not component_dir.is_dir():
+        raise SystemExit(f"components/{args.component} が見つかりません")
 
     zip_path = build_artifact(component_dir, build_root, _default_runner)
     print(f"ビルド完了: {zip_path}")

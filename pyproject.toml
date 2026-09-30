@@ -20,5 +20,6 @@ package = false
 dev = ["pytest"]
 
 [tool.pytest.ini_options]
+addopts = "--import-mode=importlib"
 pythonpath = ["scripts"]
 testpaths = ["tests", "components"]

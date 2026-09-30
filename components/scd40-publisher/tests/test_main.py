@@ -74,6 +74,34 @@ def test_main_exits_when_sensor_factory_fails():
     assert exc_info.value.code == 1
 
 
+def test_main_exits_when_publisher_factory_fails(caplog):
+    class RecordingSensor(FakeSensor):
+        def __init__(self):
+            super().__init__()
+            self.read_call_count = 0
+
+        def read(self):
+            self.read_call_count += 1
+            return super().read()
+
+    sensor = RecordingSensor()
+
+    def failing_publisher_factory(topic):
+        raise RuntimeError("ipc connection failed")
+
+    with caplog.at_level(logging.ERROR):
+        with pytest.raises(SystemExit) as exc_info:
+            main(
+                sensor_factory=lambda: sensor,
+                publisher_factory=failing_publisher_factory,
+                max_cycles=1,
+            )
+
+    assert exc_info.value.code == 1
+    assert sensor.read_call_count == 0
+    assert "パブリッシャーの初期化に失敗しました" in caplog.text
+
+
 def test_main_runs_bounded_number_of_cycles():
     reading = SensorReading(co2_ppm=812, temperature_c=24.3, humidity_percent=45.2)
     sensor = FakeSensor(readings=[reading, reading, reading])

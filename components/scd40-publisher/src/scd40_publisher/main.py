@@ -73,7 +73,11 @@ def main(
         logger.exception("SCD40センサーの初期化に失敗しました。起動を中止します。")
         sys.exit(1)
 
-    publisher = publisher_factory(topic)
+    try:
+        publisher = publisher_factory(topic)
+    except Exception:
+        logger.exception("パブリッシャーの初期化に失敗しました。起動を中止します。")
+        sys.exit(1)
 
     cycles = 0
     while max_cycles is None or cycles < max_cycles:

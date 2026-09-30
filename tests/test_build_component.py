@@ -1,7 +1,9 @@
 import zipfile
 from pathlib import Path
 
-from build_component import build_artifact
+import pytest
+
+from build_component import build_artifact, main
 
 
 def _write_component(component_dir: Path) -> None:
@@ -46,6 +48,7 @@ def test_build_artifact_creates_zip_with_expected_contents(tmp_path):
             str(component_dir),
             "--no-dev",
             "--no-emit-project",
+            "--no-header",
             "--format",
             "requirements-txt",
         ]
@@ -58,3 +61,11 @@ def test_build_artifact_creates_zip_with_expected_contents(tmp_path):
         assert "src/scd40_publisher/main.py" in names
         assert not any("__pycache__" in name or name.endswith(".pyc") for name in names)
         assert zip_file.read("requirements.txt").decode() == "adafruit-blinka==8.0.0\n"
+
+
+def test_main_exits_with_message_when_component_is_missing():
+    with pytest.raises(SystemExit) as exc_info:
+        main(["no-such-component"])
+
+    assert exc_info.value.code
+    assert "no-such-component" in str(exc_info.value.code)
