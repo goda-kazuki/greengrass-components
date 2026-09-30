@@ -1,0 +1,16 @@
+[project]
+name = "scd40-publisher"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "adafruit-circuitpython-scd4x",
+    "adafruit-blinka",
+    "awsiotsdk",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/scd40_publisher"]
