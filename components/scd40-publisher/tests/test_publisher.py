@@ -1,4 +1,5 @@
 import json
+import re
 
 from scd40_publisher.publisher import IoTCorePublisher
 from scd40_publisher.sensor import SensorReading
@@ -28,4 +29,4 @@ def test_publish_sends_json_payload_to_configured_topic():
     assert body["co2_ppm"] == 812
     assert body["temperature_c"] == 24.3
     assert body["humidity_percent"] == 45.2
-    assert "timestamp" in body
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", body["timestamp"])

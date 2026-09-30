@@ -20,7 +20,7 @@ class IoTCorePublisher:
     def publish(self, reading: SensorReading) -> None:
         payload = {
             **asdict(reading),
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         }
         self._ipc_client.publish(self._topic, json.dumps(payload).encode("utf-8"))
 
