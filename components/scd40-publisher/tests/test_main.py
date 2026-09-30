@@ -114,3 +114,32 @@ def test_main_uses_environment_overrides_for_topic_and_interval(monkeypatch):
 
     assert captured_topics == ["custom/topic"]
     assert sleeps == [5.0]
+
+
+@pytest.mark.parametrize("invalid_interval", ["0", "-1", "nan", "inf", "abc"])
+def test_main_exits_on_invalid_interval(invalid_interval, monkeypatch, caplog):
+    monkeypatch.setenv("GG_MEASUREMENT_INTERVAL_SECONDS", invalid_interval)
+
+    sensor_factory_called = []
+    publisher_factory_called = []
+
+    def sensor_factory():
+        sensor_factory_called.append(True)
+        raise AssertionError("sensor_factory should not be called")
+
+    def publisher_factory(topic):
+        publisher_factory_called.append(True)
+        raise AssertionError("publisher_factory should not be called")
+
+    with caplog.at_level(logging.ERROR):
+        with pytest.raises(SystemExit) as exc_info:
+            main(
+                sensor_factory=sensor_factory,
+                publisher_factory=publisher_factory,
+                max_cycles=1,
+            )
+
+    assert exc_info.value.code == 1
+    assert len(sensor_factory_called) == 0
+    assert len(publisher_factory_called) == 0
+    assert "GG_MEASUREMENT_INTERVAL_SECONDS" in caplog.text

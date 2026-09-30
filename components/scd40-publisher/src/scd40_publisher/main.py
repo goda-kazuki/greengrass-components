@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import os
 import sys
 import time
@@ -13,6 +14,24 @@ logger = logging.getLogger("scd40_publisher")
 
 DEFAULT_TOPIC = "greengrass-components/scd40-publisher/default/telemetry"
 DEFAULT_INTERVAL_SECONDS = 60.0
+
+
+def _validate_interval(interval_str: str, default: float) -> float:
+    """Validate and parse the measurement interval in seconds.
+
+    Valid: parses as float, is finite, and > 0.
+    Invalid: non-numeric, 0, negative, nan, inf.
+    """
+    value_to_parse = interval_str if interval_str else default
+    try:
+        interval = float(value_to_parse)
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"非数値: {interval_str}") from e
+
+    if not math.isfinite(interval) or interval <= 0:
+        raise ValueError(f"正の有限値ではありません: {interval}")
+
+    return interval
 
 
 def run_cycle(sensor: Scd40Sensor, publisher: IoTCorePublisher) -> None:
@@ -37,9 +56,16 @@ def main(
     logging.basicConfig(level=logging.INFO)
 
     topic = os.environ.get("GG_TOPIC_NAME", DEFAULT_TOPIC)
-    interval_seconds = float(
-        os.environ.get("GG_MEASUREMENT_INTERVAL_SECONDS", DEFAULT_INTERVAL_SECONDS)
-    )
+    interval_str = os.environ.get("GG_MEASUREMENT_INTERVAL_SECONDS", "")
+
+    try:
+        interval_seconds = _validate_interval(interval_str, DEFAULT_INTERVAL_SECONDS)
+    except ValueError:
+        logger.exception(
+            f"無効な測定間隔です。環境変数 GG_MEASUREMENT_INTERVAL_SECONDS={interval_str} "
+            f"(デフォルト: {DEFAULT_INTERVAL_SECONDS})"
+        )
+        sys.exit(1)
 
     try:
         sensor = sensor_factory()
