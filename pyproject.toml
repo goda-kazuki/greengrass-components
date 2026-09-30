@@ -1,0 +1,25 @@
+[project]
+name = "greengrass-components"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = [
+    "pyyaml",
+    "scd40-publisher",
+]
+
+[tool.uv.sources]
+scd40-publisher = { workspace = true }
+
+[tool.uv.workspace]
+members = ["components/*"]
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = ["pytest"]
+
+[tool.pytest.ini_options]
+addopts = "--import-mode=importlib"
+pythonpath = ["scripts"]
+testpaths = ["tests", "components"]

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Greengrassコンポーネント管理リポジトリ セットアップ 設計書</title>
+<style>
+:root {
+  --bg: #fafaf8; --fg: #1f2328; --muted: #656d76; --card: #ffffff;
+  --border: #d8dee4; --accent: #0969da; --code-bg: #f3f4f6;
+  --warn-bg: #fff8e1; --warn-bd: #d29922; --info-bg: #eaf3ff; --info-bd: #0969da;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1117; --fg: #e6edf3; --muted: #8b949e; --card: #161b22;
+    --border: #30363d; --accent: #58a6ff; --code-bg: #1f242c;
+    --warn-bg: #2d2410; --warn-bd: #d29922; --info-bg: #0f2138; --info-bd: #58a6ff;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 16px/1.75 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", sans-serif;
+}
+.layout { max-width: 1080px; margin: 0 auto; padding: 24px 16px 64px; display: grid; gap: 24px; grid-template-columns: 1fr; }
+@media (min-width: 960px) { .layout { grid-template-columns: 220px minmax(0, 1fr); } .toc { position: sticky; top: 24px; align-self: start; } }
+header.page { grid-column: 1 / -1; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+header.page h1 { margin: 0 0 4px; font-size: 1.6rem; line-height: 1.35; }
+header.page .meta { color: var(--muted); font-size: .85rem; }
+.toc { font-size: .9rem; }
+.toc strong { display: block; margin-bottom: 6px; color: var(--muted); }
+.toc ol { margin: 0; padding-left: 1.2em; }
+.toc a { color: var(--accent); text-decoration: none; }
+.toc a:hover { text-decoration: underline; }
+main > section { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; margin-bottom: 16px; }
+main h2 { margin: 0 0 8px; font-size: 1.2rem; }
+main h3 { margin: 16px 0 6px; font-size: 1.05rem; }
+section.tldr { border-left: 5px solid var(--accent); }
+.callout { border-left: 4px solid; border-radius: 6px; padding: 8px 12px; margin: 10px 0; }
+.callout.warn { background: var(--warn-bg); border-color: var(--warn-bd); }
+.callout.info { background: var(--info-bg); border-color: var(--info-bd); }
+table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: .92rem; display: block; overflow-x: auto; }
+th, td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; vertical-align: top; }
+th { background: var(--code-bg); }
+code { background: var(--code-bg); padding: .1em .35em; border-radius: 4px; font: .88em ui-monospace, SFMono-Regular, Menlo, monospace; }
+pre { background: var(--code-bg); padding: 12px; border-radius: 8px; overflow-x: auto; }
+pre code { background: none; padding: 0; }
+details { border: 1px solid var(--border); border-radius: 8px; margin: 8px 0; padding: 0 12px; }
+details[open] { padding-bottom: 10px; }
+summary { cursor: pointer; padding: 8px 0; font-weight: 600; }
+a { color: var(--accent); }
+.diagram { margin: 8px 0 16px; overflow-x: auto; }
+.diagram svg { display: block; width: 100%; min-width: 560px; max-width: 880px; height: auto; }
+.diagram text { fill: var(--fg); font-size: 15px; font-family: inherit; }
+.diagram text.sub { fill: var(--muted); font-size: 13px; }
+.diagram text.cap { fill: var(--muted); font-size: 13px; font-weight: 600; }
+.diagram .node { fill: var(--card); stroke: var(--border); stroke-width: 1.5; }
+.diagram .node.accent { fill: var(--info-bg); stroke: var(--accent); }
+.diagram .node.warn { fill: var(--warn-bg); stroke: var(--warn-bd); }
+.diagram .group { fill: none; stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 6 4; }
+.diagram .edge { stroke: var(--muted); stroke-width: 1.8; fill: none; }
+.diagram marker path { fill: var(--muted); }
+@media print {
+  body { background: #fff; color: #000; }
+  .toc { display: none; }
+  .layout { display: block; }
+  main > section { break-inside: avoid; }
+  details { border: none; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+  <header class="page">
+    <h1>Greengrassコンポーネント管理リポジトリ セットアップ 設計書</h1>
+    <div class="meta">元ファイル: 2026-09-29-greengrass-scd40-component-setup-design.md</div>
+  </header>
+  <!-- 目次: 本文の各 section の id と対応させる -->
+  <nav class="toc">
+    <strong>目次</strong>
+    <ol>
+      <li><a href="#tldr">結論</a></li>
+      <li><a href="#overview">全体像</a></li>
+      <li><a href="#points">要点</a></li>
+      <li><a href="#actions">判断・対応が必要な点</a></li>
+      <li><a href="#details">詳細</a></li>
+      <li><a href="#source">元ファイル</a></li>
+    </ol>
+  </nav>
+  <main>
+    <section id="tldr" class="tldr">
+      <h2>結論</h2>
+      <p>手元の Raspberry Pi にある Greengrass デバイスへ、自作コンポーネントを継続的に届けるための開発の土台を作ります。</p>
+      <p>第一弾は、SCD40 センサーの値(CO2・温度・湿度)を AWS IoT Core へ定期送信するコンポーネントです。複数コンポーネントを扱えるモノレポとし、ビルドとデプロイはスクリプトで自動化します。</p>
+      <p>AWS 側のリソース作成と CI は今回の対象外です。</p>
+    </section>
+
+    <section id="overview">
+      <h2>全体像</h2>
+
+      <h3>デプロイの流れ</h3>
+      <div class="diagram">
+        <svg viewBox="0 0 860 104" role="img" aria-label="開発機でビルドした zip を S3 に上げ、Greengrass に登録してから Raspberry Pi へデプロイする流れ">
+          <defs><marker id="arrow1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z"/></marker></defs>
+          <rect class="node" x="10" y="20" width="130" height="64" rx="10"/>
+          <text x="75" y="48" text-anchor="middle">開発機</text>
+          <text class="sub" x="75" y="68" text-anchor="middle">uv でビルド</text>
+          <line class="edge" x1="140" y1="52" x2="230" y2="52" marker-end="url(#arrow1)"/>
+          <text class="sub" x="185" y="44" text-anchor="middle">アップロード</text>
+          <rect class="node accent" x="230" y="20" width="130" height="64" rx="10"/>
+          <text x="295" y="48" text-anchor="middle">S3 バケット</text>
+          <text class="sub" x="295" y="68" text-anchor="middle">zip を保管</text>
+          <line class="edge" x1="360" y1="52" x2="450" y2="52" marker-end="url(#arrow1)"/>
+          <text class="sub" x="405" y="44" text-anchor="middle">登録</text>
+          <rect class="node accent" x="450" y="20" width="170" height="64" rx="10"/>
+          <text x="535" y="48" text-anchor="middle">AWS IoT Greengrass</text>
+          <text class="sub" x="535" y="68" text-anchor="middle">登録・デプロイ作成</text>
+          <line class="edge" x1="620" y1="52" x2="700" y2="52" marker-end="url(#arrow1)"/>
+          <text class="sub" x="660" y="44" text-anchor="middle">デプロイ</text>
+          <rect class="node" x="700" y="20" width="150" height="64" rx="10"/>
+          <text x="775" y="48" text-anchor="middle">Raspberry Pi</text>
+          <text class="sub" x="775" y="68" text-anchor="middle">Greengrass 導入済み</text>
+        </svg>
+      </div>
+
+      <h3>実行時のデータの流れ</h3>
+      <div class="diagram">
+        <svg viewBox="0 0 860 150" role="img" aria-label="Raspberry Pi 上で SCD40 の値をコンポーネントが読み取り、Greengrass IPC 経由で AWS IoT Core へパブリッシュする流れ">
+          <defs><marker id="arrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z"/></marker></defs>
+          <rect class="group" x="150" y="10" width="430" height="130" rx="14"/>
+          <text class="cap" x="162" y="30">Raspberry Pi(Greengrass)</text>
+          <rect class="node" x="10" y="44" width="130" height="64" rx="10"/>
+          <text x="75" y="72" text-anchor="middle">SCD40 センサー</text>
+          <text class="sub" x="75" y="92" text-anchor="middle">CO2・温度・湿度</text>
+          <line class="edge" x1="140" y1="76" x2="190" y2="76" marker-end="url(#arrow2)"/>
+          <text class="sub" x="165" y="68" text-anchor="middle">I2C</text>
+          <rect class="node accent" x="190" y="44" width="170" height="64" rx="10"/>
+          <text x="275" y="72" text-anchor="middle">scd40-publisher</text>
+          <text class="sub" x="275" y="92" text-anchor="middle">既定60秒ごとに測定</text>
+          <line class="edge" x1="360" y1="76" x2="420" y2="76" marker-end="url(#arrow2)"/>
+          <rect class="node" x="420" y="44" width="140" height="64" rx="10"/>
+          <text x="490" y="72" text-anchor="middle">Greengrass IPC</text>
+          <text class="sub" x="490" y="92" text-anchor="middle">PublishToIoTCore</text>
+          <line class="edge" x1="560" y1="76" x2="680" y2="76" marker-end="url(#arrow2)"/>
+          <text class="sub" x="620" y="68" text-anchor="middle">パブリッシュ</text>
+          <rect class="node accent" x="680" y="44" width="170" height="64" rx="10"/>
+          <text x="765" y="72" text-anchor="middle">AWS IoT Core</text>
+          <text class="sub" x="765" y="92" text-anchor="middle">テレメトリ用トピック</text>
+        </svg>
+      </div>
+    </section>
+
+    <section id="points">
+      <h2>要点</h2>
+      <ul>
+        <li><strong>届ける仕組みを先に作る。</strong>Greengrass デバイスに自作コンポーネントをデプロイし続けられるよう、開発、ビルド、デプロイの土台を整える。</li>
+        <li><strong>まず1つ、センサーの値を送る。</strong>SCD40 の CO2・温度・湿度を、定期的に AWS IoT Core へ届ける。</li>
+        <li><strong>増やしやすくする。</strong>複数コンポーネントを1つのリポジトリで扱う。追加はディレクトリを足すだけで済む。</li>
+        <li><strong>デバイスは軽く保つ。</strong>uv は開発機だけで使い、デバイス側は Greengrass が前提とする Python と pip だけで動かす。</li>
+        <li><strong>失敗には単純に対処する。</strong>読み取りや送信が失敗したらログを残して続行する。送信できなかったデータは捨て、キューは持たない。</li>
+        <li><strong>手作業を減らす。</strong>ビルドとデプロイはスクリプト化する。テストはハードウェアなしの開発機でも動くようにする。</li>
+        <li><strong>範囲を絞る。</strong>AWS リソースの作成と CI は今回やらない。</li>
+      </ul>
+    </section>
+
+    <section id="actions">
+      <h2>判断・対応が必要な点</h2>
+      <div class="callout warn">
+        <strong>利用者が事前に用意するもの。</strong>このリポジトリは AWS リソースを作りません。
+      </div>
+      <ul>
+        <li>成果物を置く S3 バケット、対象の IoT Thing と Thing Group を用意する。</li>
+        <li>コンポーネントが IoT Core へ送信するために必要な IAM ポリシーと認可設定を用意する。</li>
+        <li>デプロイ時に環境変数 <code>GG_ARTIFACT_BUCKET</code> と <code>AWS_PROFILE</code> を設定する。AWS CLI のプロファイルは設定済みであること。</li>
+      </ul>
+      <p>今後の検討事項として、元文書は次の3点を挙げています。いずれも今回は対応しません。</p>
+      <ul>
+        <li>CI(lint とテストの自動化)。必要になった時点で検討する。</li>
+        <li>AWS リソースの IaC 化。複数コンポーネントや複数デバイスを管理する規模になった時点で検討する。</li>
+        <li>送信失敗時のバッファリングなど、キューイングとリトライの高度化。</li>
+      </ul>
+    </section>
+
+    <section id="details">
+      <h2>詳細</h2>
+      <p>ディレクトリ構成、コード例、コマンドの全文は元ファイルを参照してください。</p>
+
+      <details open>
+        <summary>背景とスコープ</summary>
+        <p>すでに Raspberry Pi に Greengrass をセットアップ済みです。このリポジトリの役割は、コンポーネントの開発、ビルド、デプロイを管理することです。言語は Python、パッケージ管理は uv を使います。</p>
+        <table>
+          <thead><tr><th>今回やる</th><th>今回やらない</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>
+                <ul>
+                  <li>モノレポ構成の整備</li>
+                  <li>センサー値を送信するコンポーネントの実装</li>
+                  <li>ビルドとデプロイのスクリプト整備</li>
+                  <li>開発とデプロイ手順のドキュメント整備</li>
+                </ul>
+              </td>
+              <td>
+                <ul>
+                  <li>AWS リソースの作成</li>
+                  <li>CI の導入(ローカル実行のみで十分とする)</li>
+                </ul>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </details>
+
+      <details open>
+        <summary>リポジトリと依存関係の方針</summary>
+        <p>ルートに uv のワークスペースを置き、各コンポーネントは <code>components/</code> 配下に独立したディレクトリとして持ちます。ビルドとデプロイ用のスクリプトと、デプロイ手順のドキュメントも同じリポジトリに置きます。</p>
+        <p>uv は依存関係の解決、ロックファイル、テスト実行に使いますが、デバイスには入れません。デバイス側の依存を最小にし、デプロイ時に uv のインストールやネットワーク到達性へ依存させないためです。</p>
+        <p>ビルド時にロック済みの依存関係を <code>requirements.txt</code> に書き出し、デバイスでは通常の <code>pip3</code> で導入します。</p>
+      </details>
+
+      <details open>
+        <summary>コンポーネントの設計(scd40-publisher)</summary>
+        <table>
+          <tbody>
+            <tr><th>センサー接続</th><td>I2C 接続の SCD40 を、Adafruit のライブラリで読み取る。ユーザー提供の動作確認スクリプトがベース。</td></tr>
+            <tr><th>実行の流れ</th><td>起動時にセンサーを初期化し、定期ループで測定して、Greengrass IPC 経由で AWS IoT Core へパブリッシュする。</td></tr>
+            <tr><th>測定間隔</th><td>既定は60秒。環境変数またはレシピのパラメータで変更できる。</td></tr>
+            <tr><th>送信内容</th><td>CO2、温度、湿度、時刻を JSON で送る。トピックは <code>greengrass-components/scd40-publisher/&lt;thingName&gt;/telemetry</code>。</td></tr>
+            <tr><th>設定</th><td>トピック名と測定間隔は、デプロイ時に上書きできるようレシピでパラメータ化する。</td></tr>
+          </tbody>
+        </table>
+        <h3>エラー時の動作</h3>
+        <table>
+          <thead><tr><th>状況</th><th>動作</th></tr></thead>
+          <tbody>
+            <tr><td>センサー読み取り失敗</td><td>ログに記録して継続し、次の測定サイクルで再試行する。</td></tr>
+            <tr><td>IoT Core への送信失敗</td><td>ログに記録し、そのデータは捨てる。シンプルさを優先し、ローカルキューは持たない。</td></tr>
+            <tr><td>起動時に I2C デバイスが見つからない</td><td>エラーログを出して終了する。再起動は Greengrass に任せる。</td></tr>
+          </tbody>
+        </table>
+        <h3>テスト方針</h3>
+        <p>pytest と mock で、I2C と Greengrass IPC を差し替えた単体テストを用意します。センサー側と送信側は、差し替えやすい構造にします。Raspberry Pi 以外の開発機でも、ハードウェアなしで <code>uv run pytest</code> が動くことを確認します。</p>
+      </details>
+
+      <details open>
+        <summary>ビルドとデプロイのスクリプト</summary>
+        <table>
+          <thead><tr><th>スクリプト</th><th>やること</th></tr></thead>
+          <tbody>
+            <tr><td>ビルド</td><td>コンポーネント名を指定して実行する。依存関係を書き出し、ソースとレシピとまとめた zip を作る。バージョンは <code>pyproject.toml</code> から取る。</td></tr>
+            <tr><td>デプロイ</td><td>コンポーネント名とバージョンを指定して実行する。zip を S3 へ上げ、レシピに S3 の場所とバージョンを入れて登録し、対象の Thing または Thing Group へのデプロイを作る。</td></tr>
+          </tbody>
+        </table>
+        <p>AWS の認証情報は、環境変数 <code>AWS_PROFILE</code> で指定したプロファイルを使います。前提となる AWS リソースと実行手順は、別途ドキュメント(<code>docs/deploy.md</code>)にまとめます。</p>
+      </details>
+    </section>
+
+    <section id="source">
+      <h2>元ファイル</h2>
+      <p><a href="2026-09-29-greengrass-scd40-component-setup-design.md">2026-09-29-greengrass-scd40-component-setup-design.md</a>(日付: 2026-09-29、対象リポジトリ: greengrass-components)</p>
+    </section>
+  </main>
+</div>
+</body>
+</html>
