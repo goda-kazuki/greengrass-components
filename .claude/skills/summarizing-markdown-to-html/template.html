@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<style>
+:root {
+  --bg: #fafaf8; --fg: #1f2328; --muted: #656d76; --card: #ffffff;
+  --border: #d8dee4; --accent: #0969da; --code-bg: #f3f4f6;
+  --warn-bg: #fff8e1; --warn-bd: #d29922; --info-bg: #eaf3ff; --info-bd: #0969da;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1117; --fg: #e6edf3; --muted: #8b949e; --card: #161b22;
+    --border: #30363d; --accent: #58a6ff; --code-bg: #1f242c;
+    --warn-bg: #2d2410; --warn-bd: #d29922; --info-bg: #0f2138; --info-bd: #58a6ff;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 16px/1.75 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", sans-serif;
+}
+.layout { max-width: 1080px; margin: 0 auto; padding: 24px 16px 64px; display: grid; gap: 24px; grid-template-columns: 1fr; }
+@media (min-width: 960px) { .layout { grid-template-columns: 220px minmax(0, 1fr); } .toc { position: sticky; top: 24px; align-self: start; } }
+header.page { grid-column: 1 / -1; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+header.page h1 { margin: 0 0 4px; font-size: 1.6rem; line-height: 1.35; }
+header.page .meta { color: var(--muted); font-size: .85rem; }
+.toc { font-size: .9rem; }
+.toc strong { display: block; margin-bottom: 6px; color: var(--muted); }
+.toc ol { margin: 0; padding-left: 1.2em; }
+.toc a { color: var(--accent); text-decoration: none; }
+.toc a:hover { text-decoration: underline; }
+main > section { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; margin-bottom: 16px; }
+main h2 { margin: 0 0 8px; font-size: 1.2rem; }
+main h3 { margin: 16px 0 6px; font-size: 1.05rem; }
+section.tldr { border-left: 5px solid var(--accent); }
+.callout { border-left: 4px solid; border-radius: 6px; padding: 8px 12px; margin: 10px 0; }
+.callout.warn { background: var(--warn-bg); border-color: var(--warn-bd); }
+.callout.info { background: var(--info-bg); border-color: var(--info-bd); }
+table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: .92rem; display: block; overflow-x: auto; }
+th, td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; vertical-align: top; }
+th { background: var(--code-bg); }
+code { background: var(--code-bg); padding: .1em .35em; border-radius: 4px; font: .88em ui-monospace, SFMono-Regular, Menlo, monospace; }
+pre { background: var(--code-bg); padding: 12px; border-radius: 8px; overflow-x: auto; }
+pre code { background: none; padding: 0; }
+details { border: 1px solid var(--border); border-radius: 8px; margin: 8px 0; padding: 0 12px; }
+details[open] { padding-bottom: 10px; }
+summary { cursor: pointer; padding: 8px 0; font-weight: 600; }
+a { color: var(--accent); }
+.diagram { margin: 8px 0 16px; overflow-x: auto; }
+.diagram svg { display: block; width: 100%; min-width: 560px; max-width: 880px; height: auto; }
+.diagram text { fill: var(--fg); font-size: 15px; font-family: inherit; }
+.diagram text.sub { fill: var(--muted); font-size: 13px; }
+.diagram text.cap { fill: var(--muted); font-size: 13px; font-weight: 600; }
+.diagram .node { fill: var(--card); stroke: var(--border); stroke-width: 1.5; }
+.diagram .node.accent { fill: var(--info-bg); stroke: var(--accent); }
+.diagram .node.warn { fill: var(--warn-bg); stroke: var(--warn-bd); }
+.diagram .group { fill: none; stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 6 4; }
+.diagram .edge { stroke: var(--muted); stroke-width: 1.8; fill: none; }
+.diagram marker path { fill: var(--muted); }
+@media print {
+  body { background: #fff; color: #000; }
+  .toc { display: none; }
+  .layout { display: block; }
+  main > section { break-inside: avoid; }
+  details { border: none; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+  <header class="page">
+    <h1>{{TITLE}}</h1>
+    <div class="meta">元ファイル: {{SOURCE}}</div>
+  </header>
+  <!-- 目次: 本文の各 section の id と対応させる -->
+  <nav class="toc">
+    <strong>目次</strong>
+    <ol>
+      <li><a href="#tldr">結論</a></li>
+      <li><a href="#overview">全体像</a></li>
+      <li><a href="#points">要点</a></li>
+      <li><a href="#actions">判断・対応が必要な点</a></li>
+      <li><a href="#details">詳細</a></li>
+      <li><a href="#source">元ファイル</a></li>
+    </ol>
+  </nav>
+  <main>
+{{BODY}}
+  </main>
+</div>
+</body>
+</html>
