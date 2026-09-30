@@ -7,11 +7,11 @@ class FakeDevice:
         self.CO2 = 812
         self.temperature = 24.3
         self.relative_humidity = 45.2
-        self.start_called = False
+        self.start_call_count = 0
         self._reads_before_ready = 2
 
     def start_periodic_measurement(self) -> None:
-        self.start_called = True
+        self.start_call_count += 1
 
     def tick(self) -> None:
         self._reads_before_ready -= 1
@@ -27,7 +27,7 @@ def test_read_starts_measurement_once():
     sensor.read()
     sensor.read()
 
-    assert device.start_called is True
+    assert device.start_call_count == 1
 
 
 def test_read_waits_until_data_ready(monkeypatch):
@@ -42,4 +42,4 @@ def test_read_waits_until_data_ready(monkeypatch):
     reading = sensor.read()
 
     assert reading == SensorReading(co2_ppm=812, temperature_c=24.3, humidity_percent=45.2)
-    assert len(sleeps) == 2
+    assert sleeps == [0.01, 0.01]
